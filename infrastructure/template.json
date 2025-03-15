@@ -1,0 +1,179 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "tenantId": {
+      "type": "String"
+    },
+    "deploymentRegion": {
+      "type": "String"
+    },
+    "logAnalyticsWorkspaceName": {
+      "type": "String"
+    },
+    "managedIdentityName": {
+      "type": "String"
+    },
+    "keyvaultName": {
+      "type": "String"
+    },
+    "eventhubNamespaceName": {
+      "type": "String"
+    },
+    "appServicePlanName": {
+      "type": "String"
+    },
+    "apiGatewayName": {
+      "type": "String"
+    },
+    "aiServiceName": {
+      "type": "String"
+    },
+    "frontEndName": {
+      "type": "String"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2020-08-01",
+      "location": "[parameters('deploymentRegion')]",
+      "name": "[parameters('logAnalyticsWorkspaceName')]",
+      "properties": {},
+      "sku": {
+        "name": "PerGB2018"
+      }
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-07-31-preview",
+      "location": "[parameters('deploymentRegion')]",
+      "name": "[parameters('managedIdentityName')]"
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-07-01",
+      "name": "[parameters('keyvaultName')]",
+      "location": "[parameters('deploymentRegion')]",
+      "properties": {
+        "enableRbacAuthorization": true,
+        "enableSoftDelete": false,
+        "softDeleteRetentionInDays": 7,
+        "tenantId": "[parameters('tenantId')]",
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "accessPolicies": []
+      }
+    },
+    {
+      "type": "Microsoft.EventHub/namespaces",
+      "apiVersion": "2024-05-01-preview",
+      "location": "[parameters('deploymentRegion')]",
+      "name": "[parameters('eventhubNamespaceName')]",
+      "properties": {
+        "zoneRedundant": true
+      },
+      "sku": {
+        "name": "Basic",
+        "tier": "Basic"
+      },
+      "resources": [
+        {
+          "type": "Microsoft.EventHub/namespaces/eventhubs",
+          "apiVersion": "2024-05-01-preview",
+          "name": "[concat(parameters('eventhubNamespaceName'), '/data')]",
+          "location": "[parameters('deploymentRegion')]",
+          "properties": {
+            "messageRetentionInDays": 1,
+            "partitionCount": 1
+          },
+          "dependsOn": [
+            "[resourceId('Microsoft.EventHub/namespaces', parameters('eventhubNamespaceName'))]"
+          ]
+        },
+        {
+          "type": "Microsoft.EventHub/namespaces/eventhubs",
+          "apiVersion": "2024-05-01-preview",
+          "name": "[concat(parameters('eventhubNamespaceName'), '/feedback')]",
+          "location": "[parameters('deploymentRegion')]",
+          "properties": {
+            "messageRetentionInDays": 1,
+            "partitionCount": 1
+          },
+          "dependsOn": [
+            "[resourceId('Microsoft.EventHub/namespaces', parameters('eventhubNamespaceName'))]"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2024-04-01",
+      "kind": "linux",
+      "location": "[parameters('deploymentRegion')]",
+      "name": "[parameters('appServicePlanName')]",
+      "sku": {
+        "name": "F1",
+        "tier": "Free"
+      },
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-04-01",
+      "kind": "app,linux",
+      "location": "[parameters('deploymentRegion')]",
+      "name": "[parameters('apiGatewayName')]",
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+        "reserved": true,
+        "siteConfig": {
+          "linuxFxVersion": "DOTNETCORE|8.0"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('managedIdentityName'))]",
+        "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyvaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-04-01",
+      "kind": "app,linux",
+      "location": "[parameters('deploymentRegion')]",
+      "name": "[parameters('aiServiceName')]",
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+        "[resourceId('Microsoft.Web/sites', parameters('apiGatewayName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/staticSites",
+      "apiVersion": "2022-03-01",
+      "name": "[parameters('frontEndName')]",
+      "location": "eastasia",
+      "properties": {
+        "buildProperties": {
+          "appLocation": "frontEnd",
+          "apiLocation": "",
+          "outputLocation": "build"
+        }
+      },
+      "sku": {
+        "Tier": "Standard",
+        "Name": "Standard"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('apiGatewayName'))]"
+      ]
+    }
+  ]
+}

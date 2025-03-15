@@ -1,0 +1,7 @@
+﻿@ApiGateway_HostAddress = http://localhost:5107
+
+POST {{ApiGateway_HostAddress}}/data/
+Accept: application/json
+
+###
+

@@ -1,0 +1,68 @@
+name: Deploy Application - API Gateway
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/deploy-apiGateway.yaml"
+      - "apiGateway/**"
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Load parameters.env into environment
+        run: |
+          cat .github/workflows/parameters.env >> $GITHUB_ENV
+
+      - name: Restore Dependencies
+        run: dotnet restore apiGateway/ApiGateway.sln
+
+      - name: Build
+        run: dotnet build apiGateway/ApiGateway.sln --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish apiGateway/ApiGateway/ApiGateway.csproj --configuration Release --output ./publish --no-restore
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.API_GATEWAY_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_APIGATEWAY }}
+          package: ./publish
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: App Settings
+        run: |
+          CLIENT_ID=$(echo "$AZURE_CREDENTIALS" | jq -r '.clientId')
+
+          az webapp config appsettings set \
+            --resource-group $RESOURCE_GROUP \
+            --name $API_GATEWAY_NAME \
+            --settings "Keyvault__Uri=https://$KEYVAULT_NAME.vault.azure.net/" \
+                       "AZURE_CLIENT_ID=$CLIENT_ID"
+
+#      - name: Verify API Gateway is Running
+#        run: |
+#          response=$(curl -s -o /dev/null -w "%{http_code}" https://$API_GATEWAY_NAME.azurewebsites.net/health)
+#          if [[ "$response" -ne 200 ]]; then
+#            echo "API Gateway is not responding with HTTP 200. Deployment failed."
+#            exit 1
+#          fi

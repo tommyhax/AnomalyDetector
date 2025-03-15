@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "tenantId": {
+      "value": ""
+    },
+    "deploymentRegion": {
+      "value": "australiaeast"
+    },
+    "logAnalyticsWorkspaceName": {
+      "value": "la-anomalydetector"
+    },
+    "managedIdentityName": {
+      "value": "mi-anomalydetector"
+    },
+    "keyvaultName": {
+      "value": "kv-anomalydetector"
+    },
+    "eventhubNamespaceName": {
+      "value": "eh-anomalydetector"
+    },
+    "appServicePlanName": {
+      "value": "asp-anomalydetector"
+    },
+    "apiGatewayName": {
+      "value": "apigw-anomalydetector"
+    },
+    "aiServiceName": {
+      "value": "aisvc-anomalydetector"
+    },
+    "frontEndName": {
+      "value": "fe-anomalydetector"
+    }
+  }
+}

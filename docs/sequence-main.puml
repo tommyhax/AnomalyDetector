@@ -1,0 +1,28 @@
+@startuml
+title AI Anomaly Detector - Main Sequence
+
+actor User
+participant FrontEnd as "Front End"
+participant DataStream as "Data Stream"
+participant ApiGateway as "API Gateway"
+participant AiService as "AI Service"
+participant AiRetrainer as "AI Retrainer"
+participant EventHubs as "Event Hubs"
+
+== Data Collection Loop ==
+DataStream -> ApiGateway: POST data
+ApiGateway -> EventHubs: Publish data
+== User Initiation ==
+User -> FrontEnd: Front end starts
+FrontEnd -> ApiGateway: Connect to SignalR Hub
+== User Feedback Loop ==
+EventHubs -> AiService: Consume data
+AiService -> ApiGateway: POST anomaly
+ApiGateway -> FrontEnd: Push anomaly (SignalR)
+User -> FrontEnd: Anomaly feedback (true/false)
+FrontEnd -> ApiGateway: POST feedback
+ApiGateway -> EventHubs: Publish feedback
+EventHubs -> AiRetrainer: Consume feedback
+AiRetrainer -> AiService: POST updated model
+
+@enduml

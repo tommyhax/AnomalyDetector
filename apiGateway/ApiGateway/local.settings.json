@@ -1,0 +1,33 @@
+{
+  "AuthSettings": {
+    "TokenSettings": {
+      "Key": "0cXx3jZJc3CZj6KFTiOit6Zcll7hqkK1Xeh7UmlgZqU=",
+      "Issuer": "MyIssuer",
+      "Audience": "MyAudience",
+      "ExpiresInMinutes": 60
+    },
+    "ClientSettings": {
+      "ClientId": "YH7ZX3+Jk0e9B0tw+32oqA==",
+      "ClientSecret": "Wrvh7L7kBEa6J9RSmaNmkw=="
+    }
+  },
+  "SignalRSettings": {
+    "Endpoint": "/hub",
+    "AnomalyHub": "anomalyHub"
+  },
+  "EventHubSettings": {
+    "ConnectionString": "COPY FROM KEYVAULT", 
+    "DataQueue": "data",
+    "FeedbackQueue": "feedback"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.AspNetCore.SignalR": "Debug",
+      "Microsoft.AspNetCore.Http.Connections": "Debug"
+    }
+  },
+  "AllowedHosts": "*"
+}
+

@@ -1,0 +1,52 @@
+name: Deploy Application - AI Service
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/deploy-aiService.yaml"
+      - "aiService/**"
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLIENT_ID: ${{ secrets.AUTHSETTINGS_CLIENTSETTINGS_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.AUTHSETTINGS_CLIENTSETTINGS_CLIENT_SECRET }}
+      APIGATEWAY_URL: ${{ secrets.AZURE_APIGATEWAY_URL }}
+      EVENTHUB_CONNECTIONSTRING: ${{ secrets.EVENTHUBSETTINGS_CONNECTIONSTRING }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Load parameters.env into environment
+        run: |
+          cat .github/workflows/parameters.env >> $GITHUB_ENV
+
+      - name: Create and start virtual environment and install dependencies
+        working-directory: aiService
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+        
+      - name: Archive Production Artifacts
+        working-directory: aiService
+        run: |
+          zip -r ../ai_service.zip .
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AI_SERVICE_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_AISERVICE }}
+          package: ai_service.zip
+

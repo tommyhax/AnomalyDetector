@@ -1,0 +1,15 @@
+@startuml
+title AI Anomaly Detector - Internal Auth Sequences
+
+participant ApiClient as "API Client"
+participant ApiGateway as "API Gateway"
+participant OtherService as "Other Service"
+
+== Client to API Gateway ==
+ApiClient -> ApiGateway: /getToken
+ApiClient -> ApiGateway: /endpoint with bearer token
+== Client to another API Service ==
+ApiClient -> ApiGateway: /getToken
+ApiClient -> OtherService: /endpoint with bearer token
+OtherService -> ApiGateway: /validateToken
+@enduml

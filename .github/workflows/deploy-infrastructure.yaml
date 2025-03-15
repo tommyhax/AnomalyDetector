@@ -1,0 +1,157 @@
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      AUTHSETTINGS_CLIENTSETTINGS_CLIENT_ID: ${{ secrets.AUTHSETTINGS_CLIENTSETTINGS_CLIENT_ID }}
+      AUTHSETTINGS_CLIENTSETTINGS_CLIENT_SECRET: ${{ secrets.AUTHSETTINGS_CLIENTSETTINGS_CLIENT_SECRET }}
+      AUTHSETTINGS_TOKENSETTINGS_KEY: ${{ secrets.AUTHSETTINGS_TOKENSETTINGS_KEY }}
+      GH_TOKEN: ${{ secrets.GH_PAT }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Load parameters.env into environment
+        run: |
+          cat .github/workflows/parameters.env >> $GITHUB_ENV
+
+      - name: Debug Environment Variables
+        run: |
+          echo "RESOURCE_GROUP=$RESOURCE_GROUP"
+          echo "DEPLOYMENT_REGION=$DEPLOYMENT_REGION"
+          echo "LOGANALYTICS_WORKSPACE_NAME=$LOGANALYTICS_WORKSPACE_NAME"
+          echo "MANAGED_IDENTITY_NAME=$MANAGED_IDENTITY_NAME"
+          echo "KEYVAULT_NAME=$KEYVAULT_NAME"
+          echo "EVENTHUB_NAMESPACE_NAME=$EVENTHUB_NAMESPACE_NAME"
+          echo "APP_SERVICE_PLAN_NAME=$APP_SERVICE_PLAN_NAME"
+          echo "API_GATEWAY_NAME=$API_GATEWAY_NAME"
+          echo "AI_SERVICE_NAME=$AI_SERVICE_NAME"
+          echo "FRONT_END_NAME=$FRONT_END_NAME"
+
+      - name: Inject parameters into parameters.json
+        run: |
+          TENANT_ID=$(echo "$AZURE_CREDENTIALS" | jq -r '.tenantId')
+
+          jq --arg tenantId "$TENANT_ID" \
+             --arg deploymentRegion "$DEPLOYMENT_REGION" \
+             --arg logAnalyticsWorkspaceName "$LOGANALYTICS_WORKSPACE_NAME" \
+             --arg managedIdentityName "$MANAGED_IDENTITY_NAME" \
+             --arg keyvaultName "$KEYVAULT_NAME" \
+             --arg eventhubNamespaceName "$EVENTHUB_NAMESPACE_NAME" \
+             --arg appServicePlanName "$APP_SERVICE_PLAN_NAME" \
+             --arg apiGatewayName "$API_GATEWAY_NAME" \
+             --arg aiServiceName "$AI_SERVICE_NAME" \
+             --arg frontEndName "$FRONT_END_NAME" \
+          '
+              .parameters.tenantId.value = $tenantId |
+              .parameters.deploymentRegion.value = $deploymentRegion |
+              .parameters.logAnalyticsWorkspaceName.value = $logAnalyticsWorkspaceName |
+              .parameters.managedIdentityName.value = $managedIdentityName |
+              .parameters.keyvaultName.value = $keyvaultName |
+              .parameters.eventhubNamespaceName.value = $eventhubNamespaceName |
+              .parameters.appServicePlanName.value = $appServicePlanName |
+              .parameters.apiGatewayName.value = $apiGatewayName |
+              .parameters.aiServiceName.value = $aiServiceName |
+              .parameters.frontEndName.value = $frontEndName
+          ' \
+          infrastructure/parameters.json > temp.json && mv temp.json infrastructure/parameters.json
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Ensure Resource Group Exists
+        run: |
+          az group create --name $RESOURCE_GROUP --location $DEPLOYMENT_REGION
+
+      - name: Deploy ARM Template
+        run: |
+          az deployment group create \
+            --resource-group $RESOURCE_GROUP \
+            --template-file infrastructure/template.json \
+            --parameters @infrastructure/parameters.json
+
+      - name: Assign Key Vault Role to Managed Identity, Managed Identity to API Gateway
+        run: |
+          OBJECT_ID=$(az identity show --resource-group $RESOURCE_GROUP --name $MANAGED_IDENTITY_NAME --query 'principalId' --output tsv)
+          SUBSCRIPTION_ID=$(echo "$AZURE_CREDENTIALS" | jq -r '.subscriptionId')
+
+          az role assignment create --assignee $OBJECT_ID \
+            --role "Key Vault Secrets User" \
+            --scope /subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.KeyVault/vaults/$KEYVAULT_NAME
+
+          for i in {1..3}; do
+            az webapp identity assign \
+              --resource-group $RESOURCE_GROUP \
+              --name $API_GATEWAY_NAME \
+              --identities "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.ManagedIdentity/userAssignedIdentities/$MANAGED_IDENTITY_NAME" \
+            && break || sleep 5
+          done
+
+      - name: Update GitHub Secrets
+        run: |
+          apigateway_publish_profile=$(az webapp deployment list-publishing-profiles \
+            --name $API_GATEWAY_NAME \
+            --resource-group $RESOURCE_GROUP \
+            --xml)
+
+          aiservice_publish_profile=$(az webapp deployment list-publishing-profiles \
+            --name $AI_SERVICE_NAME \
+            --resource-group $RESOURCE_GROUP \
+            --xml)
+
+          frontend_token=$(az staticwebapp secrets list \
+            --name $FRONT_END_NAME \
+            --query properties.apiKey --output tsv)
+
+          apigateway_url=$(az webapp show \
+            --name $API_GATEWAY_NAME \
+            --resource-group $RESOURCE_GROUP \
+            --query "defaultHostName" --output tsv)
+
+          eventhub_connectionstring=$(az eventhubs namespace authorization-rule keys list \
+            --resource-group $RESOURCE_GROUP \
+            --namespace-name $EVENTHUB_NAMESPACE_NAME \
+            --name RootManageSharedAccessKey \
+            --query primaryKey --output tsv)
+
+          echo "$apigateway_publish_profile" | gh secret set AZURE_WEBAPP_PUBLISH_PROFILE_APIGATEWAY
+          echo "$aiservice_publish_profile" | gh secret set AZURE_WEBAPP_PUBLISH_PROFILE_AISERVICE
+          echo "$frontend_token" | gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN_FRONTEND
+          echo "https://${apigateway_url}" | gh secret set AZURE_APIGATEWAY_URL
+
+          echo "$eventhub_connectionstring" | gh secret set EVENTHUBSETTINGS_CONNECTIONSTRING
+
+          az keyvault secret set \
+            --vault-name $KEYVAULT_NAME \
+            --name EventHubSettings--ConnectionString \
+            --value "$secrets.EVENTHUBSETTINGS_CONNECTIONSTRING"
+
+      - name: Add AuthSettings to keyvault
+        run: |
+          az keyvault secret set \
+            --vault-name $KEYVAULT_NAME \
+            --name AuthSettings--ClientSettings--ClientId \
+            --value "$AUTHSETTINGS_CLIENTSETTINGS_CLIENT_ID"
+
+          az keyvault secret set \
+            --vault-name $KEYVAULT_NAME \
+            --name AuthSettings--ClientSettings--ClientSecret \
+            --value "$AUTHSETTINGS_CLIENTSETTINGS_CLIENT_SECRET"
+
+          az keyvault secret set \
+            --vault-name $KEYVAULT_NAME \
+            --name AuthSettings--TokenSettings--Key \
+            --value "$AUTHSETTINGS_TOKENSETTINGS_KEY"

@@ -1,0 +1,20 @@
+name: Deploy All Applications
+
+on:
+  workflow_dispatch: 
+
+jobs:
+  deploy-apiGateway:
+    uses: ./.github/workflows/deploy-apiGateway.yaml
+    secrets: inherit
+
+  deploy-aiService:
+    needs: deploy-apiGateway
+    uses: ./.github/workflows/deploy-aiService.yaml
+    secrets: inherit
+
+  deploy--frontEnd:
+    needs: deploy-aiService
+    uses: ./.github/workflows/deploy-frontEnd.yaml
+    secrets: inherit
+
