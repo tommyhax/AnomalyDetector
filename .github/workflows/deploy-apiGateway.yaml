@@ -37,21 +37,25 @@ jobs:
       - name: Publish
         run: dotnet publish apiGateway/ApiGateway/ApiGateway.csproj --configuration Release --output ./publish --no-restore
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: ${{ env.API_GATEWAY_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_APIGATEWAY }}
-          package: ./publish
-
       - name: Azure Login
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       
+      - name: Assign Key Vault Role to Managed Identity
+        run: |
+          OBJECT_ID=$(az identity show --resource-group $RESOURCE_GROUP --name $MANAGED_IDENTITY_NAME --query 'principalId' --output tsv)
+          SUBSCRIPTION_ID=$(echo "$AZURE_CREDENTIALS" | jq -r '.subscriptionId')
+
+          az role assignment create \
+            --assignee-object-id $OBJECT_ID \
+            --assignee-principal-type ServicePrincipal \
+            --role "Key Vault Secrets User" \
+            --scope /subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.KeyVault/vaults/$KEYVAULT_NAME
+
       - name: App Settings
         run: |
-          CLIENT_ID=$(echo "$AZURE_CREDENTIALS" | jq -r '.clientId')
+          CLIENT_ID=$(az identity show --resource-group $RESOURCE_GROUP --name $MANAGED_IDENTITY_NAME --query 'clientId' --output tsv)
 
           az webapp config appsettings set \
             --resource-group $RESOURCE_GROUP \
@@ -59,10 +63,17 @@ jobs:
             --settings "Keyvault__Uri=https://$KEYVAULT_NAME.vault.azure.net/" \
                        "AZURE_CLIENT_ID=$CLIENT_ID"
 
-#      - name: Verify API Gateway is Running
-#        run: |
-#          response=$(curl -s -o /dev/null -w "%{http_code}" https://$API_GATEWAY_NAME.azurewebsites.net/health)
-#          if [[ "$response" -ne 200 ]]; then
-#            echo "API Gateway is not responding with HTTP 200. Deployment failed."
-#            exit 1
-#          fi
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.API_GATEWAY_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_APIGATEWAY }}
+          package: ./publish
+
+      - name: Verify API Gateway is Running
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://$API_GATEWAY_NAME.azurewebsites.net/health)
+          if [[ "$response" -ne 200 ]]; then
+            echo "API Gateway is not responding with HTTP 200. Deployment failed."
+            exit 1
+          fi

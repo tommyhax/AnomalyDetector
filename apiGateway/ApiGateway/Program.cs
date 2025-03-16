@@ -19,16 +19,17 @@ var keyvaultUri =
        builder.Configuration["Keyvault:Uri"]
     ?? builder.Configuration["Keyvault__Uri"]; // Ensures compatibility with Azure environment variables
 
-if (builder.Environment.IsProduction())
+if (!builder.Environment.IsDevelopment())
 {
     if (string.IsNullOrEmpty(keyvaultUri))
     {
         throw new InvalidOperationException("Missing required configuration: Keyvault:Uri");
     }
 
-    var credential = new ManagedIdentityCredential(builder.Configuration["AZURE_CLIENT_ID"]);
-    builder.Configuration.AddAzureKeyVault(new Uri(keyvaultUri), credential);
+    var clientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
+    var credential = new ManagedIdentityCredential(clientId);
 
+    builder.Configuration.AddAzureKeyVault(new Uri(keyvaultUri), credential);
 }
 
 // Read config sections
@@ -138,10 +139,7 @@ app.MapControllers();
 
 app.MapGet("/health", async context =>
 {
-    var clientSettings = builder.Configuration.GetSection("AuthSettings:ClientSettings").Get<ClientSettings>()
-        ?? throw new InvalidOperationException("Missing required configuration: AuthSettings:ClientSettings");
-
-    await context.Response.WriteAsync("API Gateway is Healthy" + " and awaiting login from " + clientSettings.ClientId);
+    await context.Response.WriteAsync("API Gateway is Healthy");
 });
 
 if (signalRSettings is not null)

@@ -198,6 +198,18 @@ az webapp log download --resource-group <RESOURCE_GROUP> --name <APP_NAME>
 az webapp log tail --resource-group <RESOURCE_GROUP> --name <APP_NAME>
 ```
 
+### **Enable application logging**
+```sh
+az webapp log config --resource-group <RESOURCE_GROUP> \
+                     --name <APP_NAME> \
+                     --application-logging filesystem \
+                     --web-server-logging filesystem \
+                     --detailed-error-messages true \
+                     --failed-request-tracing true
+
+az webapp restart --resource-group <RESOURCE_GROUP> --name <APP_NAME>
+```
+
 ---
 
 ## **Final Tip: Check Logs in Azure Portal**
@@ -207,4 +219,5 @@ If CLI debugging doesn’t show enough info:
 3. Find the **failed deployment**, click on it, and read the error details.
 
 ---
+
 
