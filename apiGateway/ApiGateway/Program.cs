@@ -85,6 +85,13 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());
+
+    options.AddPolicy("AllowAiService",
+    builder => builder.SetIsOriginAllowed(origin => origin.EndsWith(".azurewebsites.net"))
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials());
+
 });
 builder.Services.AddSwaggerGen(c =>
 {

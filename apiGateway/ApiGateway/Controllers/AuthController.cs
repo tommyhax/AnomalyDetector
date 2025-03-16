@@ -51,7 +51,7 @@ namespace ApiGateway.Controllers
         }
 
         [HttpPost("validateToken")]
-        public IActionResult ValidateToken([FromBody] string token)
+        public IActionResult ValidateToken([FromBody] ValidationModel model)
         {
             try
             {
@@ -59,7 +59,7 @@ namespace ApiGateway.Controllers
 
                 var tokenHandler = new JwtSecurityTokenHandler();
 
-                tokenHandler.ValidateToken(token, new TokenValidationParameters
+                tokenHandler.ValidateToken(model.Token, new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authSettings.TokenSettings.Key)),

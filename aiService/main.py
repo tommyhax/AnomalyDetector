@@ -1,17 +1,8 @@
 import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, status, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import os
 import httpx
-
-clientId = os.getenv("CLIENT_ID", "YH7ZX3+Jk0e9B0tw+32oqA==")
-clientSecret = os.getenv("CLIENT_SECRET", "Wrvh7L7kBEa6J9RSmaNmkw==")
-apiGatewayUrl = os.getenv("API_GATEWAY_URL", "https://localhost:7133")
-eventHubConnectionString = os.getenv("EVENTHUB_CONNECTIONSTRING", "")
-
-validateTokenApi = "/auth/validateToken"
-getTokenApi = "/auth/getToken"
-anomalyApi = "/anomaly"
+from config import config
 
 app = FastAPI()
 
@@ -19,7 +10,7 @@ bearer_scheme = HTTPBearer()
 
 async def validateToken(credentials: HTTPAuthorizationCredentials = Security(bearer_scheme)):
     async with httpx.AsyncClient() as client:
-        response = await client.post(apiGatewayUrl + validateTokenApi, json={"token": credentials.credentials})
+        response = await client.post(config.ValidateTokenApi, json={"token": credentials.credentials})
 
     if response.status_code != 200:
         raise HTTPException(
