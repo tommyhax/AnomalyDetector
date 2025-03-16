@@ -155,4 +155,3 @@ if (signalRSettings is not null)
 }
 
 app.Run();
-

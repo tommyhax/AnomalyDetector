@@ -5,7 +5,6 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows/deploy-aiService.yaml"
       - "aiService/**"
   workflow_dispatch:
   workflow_call:
