@@ -25,46 +25,40 @@ jobs:
       - name: Set up Python in GitHub Actions
         uses: actions/setup-python@v4
         with:
-          python-version: "3.13"
+          python-version: "3.11"
 
       - name: Load parameters.env into environment
         run: |
           cat .github/workflows/parameters.env >> $GITHUB_ENV
 
-      - name: Create and start virtual environment and install dependencies
-        working-directory: aiService
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install -r requirements.txt
-        
       - name: Archive Production Artifacts
         working-directory: aiService
         run: |
           cp requirements.txt ../
-          zip -r ../ai_service.zip .
+          zip -r ../ai_service.zip . -x "*__pycache__*" "*venv*"
 
       - name: Azure Login
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Set Startup Command
+        run: |
+          az webapp config set --resource-group $RESOURCE_GROUP --name $AI_SERVICE_NAME \
+            --startup-file "python -m uvicorn main:app --host 0.0.0.0 --port 8000"
+
       - name: Set Python Runtime in Azure
         run: |
-          az webapp config set --resource-group rg-anomalydetector --name $AI_SERVICE_NAME --linux-fx-version "PYTHON|3.13"
+          az webapp config set --resource-group $RESOURCE_GROUP --name $AI_SERVICE_NAME --linux-fx-version "PYTHON|3.11"
 
       - name: Set Azure Environment Variables
         run: |
-          az webapp config appsettings set --resource-group rg-anomalydetector --name $AI_SERVICE_NAME \
+          az webapp config appsettings set --resource-group $RESOURCE_GROUP --name $AI_SERVICE_NAME \
             --settings CLIENT_ID=$CLIENT_ID \
                        CLIENT_SECRET=$CLIENT_SECRET \
                        API_GATEWAY_URL=$API_GATEWAY_URL \
-                       EVENTHUB_CONNECTIONSTRING=$EVENTHUB_CONNECTIONSTRING
-
-      - name: Set Startup Command in Azure
-        run: |
-          az webapp config set --resource-group rg-anomalydetector --name $AI_SERVICE_NAME \
-            --startup-file "pip install -r requirements.txt && gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8000"
+                       EVENTHUB_CONNECTIONSTRING=$EVENTHUB_CONNECTIONSTRING \
+                       SCM_DO_BUILD_DURING_DEPLOYMENT=true
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2

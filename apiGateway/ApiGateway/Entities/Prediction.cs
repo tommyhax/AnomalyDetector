@@ -2,11 +2,12 @@
 
 namespace ApiGateway.Entities
 {
-	public class Feedback
+	public class Prediction
 	{
-        [JsonPropertyName("data")]
-        public Data? Data { get; set; }
+        [JsonPropertyName("error")]
+        public float? Error { get; set; }
         [JsonPropertyName("isAnomaly")]
         public bool IsAnomaly { get; set; }
 	}
 }
+

@@ -121,7 +121,7 @@ jobs:
           az keyvault secret set \
             --vault-name $KEYVAULT_NAME \
             --name EventHubSettings--ConnectionString \
-            --value "$secrets.EVENTHUBSETTINGS_CONNECTIONSTRING"
+            --value $eventhub_connectionstring
 
       - name: Add AuthSettings to keyvault
         run: |

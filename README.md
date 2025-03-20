@@ -39,7 +39,7 @@ For implementation details and sprint planning, see [Implementation and Sprint P
 
 # System Setup
 
-For help with the Azure command-line interface, see [Azure CLI Cheat Sheet](docs/azure_cheat_sheet.md)
+For help with the Azure command-line interface, see [Azure CLI Cheat Sheet](README-Azure.md)
 
 ## Secrets configuration
 
